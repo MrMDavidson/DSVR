@@ -69,18 +69,20 @@ class DNSHandler():
 
             d = DNSRecord.parse(response)
 
-            for item in d.rr:
-                print "Item: %r (%s)" % (item.rdata, d.q.qname)
-                
+            for item in d.rr:               
                 try:
                     socket.inet_aton(str(item.rdata))
                 except:
                     print "[DB] Unable to inet_aton %s" % str(item.rdata)
                     continue
+                if str(item.rdata) in added_routes:
+                    print "[DB] Have previously added %s. Skipping" % str(item.rdata)
+                    continue
 
                 command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addregularroute.sh " + str(item.rdata)
-                print "Executing %s" % command
+                print "[DB+] Adding %s via  \"%s\"" % (str(item.rdata), command)
                 os.system(command)
+                added_routes.append(str(item.rdata))
 
             response = d.pack()
             
@@ -267,12 +269,9 @@ if __name__ == "__main__":
         sys.exit()
 
     regulardomains = getRegularTrafficDomains(options.regulardomains) 
-
-    interestingdomains = []
-    interestingdomainsng = {} #Dict to hold mapping from VPN int to interesting domains
-    existingroutes = []
     db_dns_vpn_server = []
     db_dns_upstream_server = []
+    added_routes = []
     
     # Main storage of domain filters
     # NOTE: RDMAP is a dictionary map of qtype strings to handling classses
@@ -307,15 +306,15 @@ if __name__ == "__main__":
     os.system(command)
     
     # Add selected DNS servers to route via the VPN
-    if interestingdomainsng:
-        for interfacename in interestingdomainsng:
-            intname = interfacename
-            break 
- 
-        for item in db_dns_vpn_server:
-            print "[*] Routing DNS server (%s) via first specificed int (%s)" % (item, intname)
-            command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addroutetorule.sh " + item + " " + intname #DB
-            os.system(command)
+##    if interestingdomainsng:
+##        for interfacename in interestingdomainsng:
+##            intname = interfacename
+##            break 
+## 
+##        for item in db_dns_vpn_server:
+##            print "[*] Routing DNS server (%s) via first specificed int (%s)" % (item, intname)
+##            command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addroutetorule.sh " + item + " " + intname #DB
+##            os.system(command)
    
     # Launch dsvr
     start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp, ipv6=options.ipv6, port=options.port)
