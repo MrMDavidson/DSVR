@@ -88,24 +88,24 @@ class DNSHandler():
         
     # Obtain a response from a real DNS server.
     def proxyrequest(self, request, host, port="53"):       
-        reply = None
-        try:
-            if self.server.ipv6:
-                sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+            reply = None
+            try:
+                    if self.server.ipv6:
+                            sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+                    else:
+                            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+                    sock.settimeout(3.0)
+
+                    # Send the proxy request to a randomly chosen DNS server
+                    sock.sendto(request, (host, int(port)))
+                    reply = sock.recv(1024)
+                    sock.close()
+
+            except Exception, e:
+                    print "[!] Could not proxy request: %s" % e
             else:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-            sock.settimeout(3.0)
-
-            # Send the proxy request to a randomly chosen DNS server
-            sock.sendto(request, (host, int(port)))
-            reply = sock.recv(1024)
-            sock.close()
-
-        except Exception, e:
-            print "[!] Could not proxy request: %s" % e
-        else:
-	 return reply 
+                    return reply 
 
 # UDP DNS Handler for incoming requests
 class UDPHandler(DNSHandler, SocketServer.BaseRequestHandler):
