@@ -18,13 +18,5 @@
 # either express or implied. See the License for the specific 
 # language governing permissions and limitations under the License.
 
-if [ -z "$1" ]
-  then
-  echo "no table name supplied"
-else
- ip rule | grep "lookup $1" | cut -d: -f1 >tmp.txt
- for line in `cat tmp.txt`;do 
-   ip rule del prio $line
- done
- rm tmp.txt
-fi
+ip route flush table eth0
+ip route flush table tun0

@@ -206,24 +206,7 @@ def getRegularTrafficDomains(trafficFilePath):
     file.close()
 
     return domains 
-   
-def getpeerdata():
-    peers = commands.getstatusoutput('ls /etc/ppp/peers/db* -1 | xargs -n1 basename')
-    ppppeers_dict = {}
-    if peers[0] == 0:
-
-        for peerfile in peers[1].split('\n'):
-            contents = []
-            filefullpath = "/etc/ppp/peers/" + peerfile
-            file = open(filefullpath)
-            while 1:
-                line = file.readline().rstrip("\r\n")
-                if not line:
-                    break
-                contents.append(line)
-            ppppeers_dict[peerfile] = contents
-    return ppppeers_dict
-     
+        
 # Initialize and start dsvr        
 def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53"):
     try:
@@ -318,25 +301,10 @@ if __name__ == "__main__":
         print "[*] Using the following nameservers for interesting domains: %s" % ", ".join(db_dns_vpn_server)
         db_ttl_override_value = config.get('Global','ttl-override-value')
         print "[*] TTL overide value for interesting domains: %s" % db_ttl_override_value
-                
-        my_dict = getpeerdata()
-                
-        for indexitem in my_dict:
-            peer_options = []
-            peer_detail = {}
-            for listitem in my_dict[indexitem]:
-                key = listitem.split(' ',1)
-                if "#interestingdomains" in key:
-                    interestingdomainsng[indexitem] = listitem.split(' ',2)[1].split(",")
-                    print "[*] Adding interesting domains to %s: %s" % (indexitem,listitem.split(' ',2)[1])
-                
-    # Clear existing IP Rules #DB
-    for index in interestingdomainsng:
-        tablenumstr = re.findall(r'\d+',index)
-        tablenumint = int(tablenumstr[0]) + 1
-        print "[*] Clearing existing IP Rules (Table %s)" % str(tablenumint)
-        command = os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/iprule-clear-table.sh " + str(tablenumint)
-        os.system(command)
+                                
+    print "[*] Clearing existing IP Rules"
+    command = os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/iprule-clear-table.sh "
+    os.system(command)
     
     # Add selected DNS servers to route via the VPN
     if interestingdomainsng:
