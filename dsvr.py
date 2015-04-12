@@ -52,15 +52,9 @@ class DNSHandler():
 
         # Proxy the request
         else:
-            extracted = tldextract.extract(str(d.q.qname))
-            print "Extracted: %s DOT %s DOT %s" % ( extracted.subdomain, extracted.domain, extracted.suffix)
-
-            tld = extracted.domain + "." + extracted.suffix
-            print "TLD: %s" % tld
-
             isRegular = False
                     
-            if isRegularDomain(regulardomains, str(tld)) == True:
+            if isRegularDomain(regulardomains, str(d.q.qname)) == True:
                 nameserver_tuple = random.choice(self.server.nameservers).split('#')
                 isRegular = True
             else:
@@ -234,22 +228,33 @@ def isInterestingDomain(input_dict, searchstr):
     return list
 
 def isRegularDomain(regularDomains, domain):
-    print "Checking if %s is a regular domain..." % domain
-    for i in regularDomains:
-        print "Regulr domains: %s vs %s" % ( i, domain)
-        if domain == i:
-            print "Match found!"
-            return True
+    extracted = tldextract.extract(str(domain))
+    tld = extracted.domain + "." + extracted.suffix
 
+    for regular in regularDomains:
+        if len(regular) == 0: continue
+        
+        if regular[0] == ".":
+            regular = regular[1:]
+            # Use TLD to match
+            if regular == tld:
+                print "[ ] TLD style match for \"%s\" against \"%s\". Will route normally" % (domain, regular)
+                return True
+        else:
+            # Use exact match
+            if regular == domain:
+                    print "[ ] Exact  match for \"%s\" against \"%s\". Will route normally" % (domain, regular)
+                    return True
+        
     return False
 
 def getRegularTrafficDomains(trafficFilePath):
     file = open(trafficFilePath, 'r')
     domains = []
     for line in file:
-        print "Line is '%s'" % line
         line = line.rstrip()
-        print "Now: '%s'" % line
+        if len(line) == 0: continue
+        print "[ ] Have rule for \"%s\"" % line
 
         domains.append(line)
 
