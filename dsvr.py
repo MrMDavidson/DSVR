@@ -51,8 +51,14 @@ class DNSHandler():
             print "[%s] %s: ERROR: %s" % (time.strftime("%H:%M:%S"), self.client_address[0], "invalid DNS request")
 
         # Proxy the request
-        else:  
+        else:
             extracted = tldextract.extract(str(d.q.qname))
+            print "Extracted: %s DOT %s DOT %s" % ( extracted.subdomain, extracted.domain, extracted.suffix)
+
+            tld = extracted.domain + "." + extracted.suffix
+            print "TLD: %s" % tld
+
+ 
             if 'addinterestingdomain-' in extracted.subdomain:
                 addtointerface = extracted.subdomain.split('-',2)[1]
                 domaintoadd = extracted.domain + "." + extracted.tld
@@ -61,41 +67,72 @@ class DNSHandler():
                     print "[DB-I] Temporary added %s to interesting domains (until reboot/service restart), via %s" % (domaintoadd,addtointerface)
                 else:
                     print "[DB-I] Ignoring request to add %s to interesting domains, already exists" % (domaintoadd)
-            if isInterestingDomain(interestingdomainsng,str(d.q.qname))[0] == 1:
-                nameserver_tuple = random.choice(db_dns_vpn_server).split('#')
-            else:                                
+
+            isRegular = False
+                    
+            if isRegularDomain(regulardomains, str(tld)) == True:
+                print "It's a regular domain. Yay!"
                 nameserver_tuple = random.choice(self.server.nameservers).split('#')
-                
+                isRegular = True
+            else:
+                nameserver_tuple = random.choice(db_dns_vpn_server).split('#') 
+ 
+            #if isInterestingDomain(interestingdomainsng,str(d.q.qname))[0] == 1:
+            #    nameserver_tuple = random.choice(db_dns_vpn_server).split('#')
+            #else:
+            #    nameserver_tuple = random.choice(self.server.nameservers).split('#')
+               
             response = self.proxyrequest(data,*nameserver_tuple)
+
+            if isRegular == False:
+                return response
 
             d = DNSRecord.parse(response)
 
             for item in d.rr:
-                try: socket.inet_aton(str(item.rdata))
-                except: 
-                    isInteresting = []
-                    isInteresting = isInterestingDomain(interestingdomainsng,str(d.q.qname))
-                    if isInteresting[0] == 1:
-                        interestingdomainsng[isInteresting[1]].append(str(item.rdata))
-                else:
-                    isInteresting = []
-                    isInteresting = isInterestingDomain(interestingdomainsng,str(d.q.qname))
-                    if isInteresting[0] == 1:
-                        item.ttl=int(db_ttl_override_value) #TTL overide
-                        if str(item.rdata) in existingroutes:
-                            if options.verbose:    
-                                print "[DB-I] %s | %s | %s | R~" % (str(d.q.qname),item.rdata,item.ttl) #DB Route exists, do nothing ("R~")
-                        else:
-                            if options.verbose:
-                                print "[DB-I] %s | %s | %s | R+" % (str(d.q.qname),item.rdata,item.ttl) #DB Adding route ("R+")
-                            interface=str(isInteresting[1])
-                            existingroutes.append(str(item.rdata))
-                            command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addroutetorule.sh " + str(item.rdata) + " " + str(interface)
-                            os.system(command)
-                    else:
-                        if options.verbose:
-                            print "[DB] %s | %s | %s | NR" % (str(d.q.qname),item.rdata,item.ttl) #DB No modifications ("NR")
+                print "Item: %r (%s)" % (item.rdata, d.q.qname)
+                
+                try:
+                    socket.inet_aton(str(item.rdata))
+                except:
+                    print "[DB] Unable to inet_aton %s" % str(item.rdata)
+                    continue
+
+                command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addregularroute.sh " + str(item.rdata)
+                print "Executing %s" % command
+                os.system(command)
+
             response = d.pack()
+
+
+##            for item in d.rr:
+##                print "Item: %r (%s)" % ( item.rdata , d.q.qname)
+##                
+##                try: socket.inet_aton(str(item.rdata))
+##                except: 
+##                    isInteresting = []
+##                    isInteresting = isInterestingDomain(interestingdomainsng,str(d.q.qname))
+##                    if isInteresting[0] == 1:
+##                        interestingdomainsng[isInteresting[1]].append(str(item.rdata))
+##                else:
+##                    isInteresting = []
+##                    isInteresting = isInterestingDomain(interestingdomainsng,str(d.q.qname))
+##                    if isInteresting[0] == 1:
+##                        item.ttl=int(db_ttl_override_value) #TTL overide
+##                        if str(item.rdata) in existingroutes:
+##                            if options.verbose:    
+##                                print "[DB-I] %s | %s | %s | R~" % (str(d.q.qname),item.rdata,item.ttl) #DB Route exists, do nothing ("R~")
+##                        else:
+##                            if options.verbose:
+##                                print "[DB-I] %s | %s | %s | R+" % (str(d.q.qname),item.rdata,item.ttl) #DB Adding route ("R+")
+##                            interface=str(isInteresting[1])
+##                            existingroutes.append(str(item.rdata))
+##                            command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addroutetorule.sh " + str(item.rdata) + " " + str(interface)
+##                            os.system(command)
+##                    else:
+##                        if options.verbose:
+##                            print "[DB] %s | %s | %s | NR" % (str(d.q.qname),item.rdata,item.ttl) #DB No modifications ("NR")
+##            response = d.pack()
 
         return response         
     
@@ -124,7 +161,7 @@ class DNSHandler():
             return False
     
     # Obtain a response from a real DNS server.
-    def proxyrequest(self, request, host, port="53"):
+    def proxyrequest(self, request, host, port="53"):       
         reply = None
         try:
             if self.server.ipv6:
@@ -205,6 +242,29 @@ def isInterestingDomain(input_dict, searchstr):
     list = [0]
     return list
 
+def isRegularDomain(regularDomains, domain):
+    print "Checking if %s is a regular domain..." % domain
+    for i in regularDomains:
+        print "Regulr domains: %s vs %s" % ( i, domain)
+        if domain == i:
+            print "Match found!"
+            return True
+
+    return False
+
+def getRegularTrafficDomains(trafficFilePath):
+    file = open(trafficFilePath, 'r')
+    domains = []
+    for line in file:
+        print "Line is '%s'" % line
+        line = line.rstrip()
+        print "Now: '%s'" % line
+
+        domains.append(line)
+
+    file.close()
+
+    return domains 
    
 def getpeerdata():
     peers = commands.getstatusoutput('ls /etc/ppp/peers/db* -1 | xargs -n1 basename')
@@ -269,6 +329,7 @@ if __name__ == "__main__":
     rungroup.add_option("-6","--ipv6", action="store_true", default=False, help="Run in IPv6 mode.")
     rungroup.add_option("-p","--port", action="store", metavar="53", default="53", help='Port number to listen for DNS requests.')
     rungroup.add_option("-q", "--quiet", action="store_false", dest="verbose", default=True, help="Don't show headers.")
+    rungroup.add_option("-r", "--regulardomains", action="store", help="Path to a new line separated list of domains to skip the VPN")
     parser.add_option_group(rungroup)
 
     (options,args) = parser.parse_args()
@@ -276,6 +337,12 @@ if __name__ == "__main__":
     # Print program header
     if options.verbose:
         print header
+
+    if options.regulardomains is None:
+        print "Must specify a file containing a list of regular domains to route via the unenecrypted link"
+        sys.exit()
+
+    regulardomains = getRegularTrafficDomains(options.regulardomains) 
 
     interestingdomains = []
     interestingdomainsng = {} #Dict to hold mapping from VPN int to interesting domains
@@ -293,7 +360,7 @@ if __name__ == "__main__":
     if options.port != "53":
         print "[*] Listening on an alternative port %s" % options.port
 
-    print "[*] dsvr started on interface: %s " % options.interface
+    print "[*] dsvr started on interface: %r " % options.interface
 
     # External file definitions
     if options.file:
@@ -340,7 +407,7 @@ if __name__ == "__main__":
             print "[*] Routing DNS server (%s) via first specificed int (%s)" % (item, intname)
             command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addroutetorule.sh " + item + " " + intname #DB
             os.system(command)
-    
+   
     # Launch dsvr
     start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp, ipv6=options.ipv6, port=options.port)
 
