@@ -58,24 +58,15 @@ class DNSHandler():
             tld = extracted.domain + "." + extracted.suffix
             print "TLD: %s" % tld
 
- 
-            if 'addinterestingdomain-' in extracted.subdomain:
-                addtointerface = extracted.subdomain.split('-',2)[1]
-                domaintoadd = extracted.domain + "." + extracted.tld
-                if domaintoadd not in interestingdomainsng[addtointerface]:
-                    interestingdomainsng[addtointerface].append(domaintoadd)
-                    print "[DB-I] Temporary added %s to interesting domains (until reboot/service restart), via %s" % (domaintoadd,addtointerface)
-                else:
-                    print "[DB-I] Ignoring request to add %s to interesting domains, already exists" % (domaintoadd)
-
             isRegular = False
                     
             if isRegularDomain(regulardomains, str(tld)) == True:
-                print "It's a regular domain. Yay!"
                 nameserver_tuple = random.choice(self.server.nameservers).split('#')
                 isRegular = True
             else:
                 nameserver_tuple = random.choice(db_dns_vpn_server).split('#') 
+
+            print "[ ] \"%s\" is considered a %s domain. Looking up via %s" % (d.q.qname, "regular" if isRegular == True else "VPN", nameserver_tuple[0] )
  
             #if isInterestingDomain(interestingdomainsng,str(d.q.qname))[0] == 1:
             #    nameserver_tuple = random.choice(db_dns_vpn_server).split('#')
