@@ -61,11 +61,6 @@ class DNSHandler():
                 nameserver_tuple = random.choice(db_dns_vpn_server).split('#') 
 
             print "[ ] \"%s\" is considered a %s domain. Looking up via %s" % (d.q.qname, "regular" if isRegular == True else "VPN", nameserver_tuple[0] )
- 
-            #if isInterestingDomain(interestingdomainsng,str(d.q.qname))[0] == 1:
-            #    nameserver_tuple = random.choice(db_dns_vpn_server).split('#')
-            #else:
-            #    nameserver_tuple = random.choice(self.server.nameservers).split('#')
                
             response = self.proxyrequest(data,*nameserver_tuple)
 
@@ -88,63 +83,9 @@ class DNSHandler():
                 os.system(command)
 
             response = d.pack()
-
-
-##            for item in d.rr:
-##                print "Item: %r (%s)" % ( item.rdata , d.q.qname)
-##                
-##                try: socket.inet_aton(str(item.rdata))
-##                except: 
-##                    isInteresting = []
-##                    isInteresting = isInterestingDomain(interestingdomainsng,str(d.q.qname))
-##                    if isInteresting[0] == 1:
-##                        interestingdomainsng[isInteresting[1]].append(str(item.rdata))
-##                else:
-##                    isInteresting = []
-##                    isInteresting = isInterestingDomain(interestingdomainsng,str(d.q.qname))
-##                    if isInteresting[0] == 1:
-##                        item.ttl=int(db_ttl_override_value) #TTL overide
-##                        if str(item.rdata) in existingroutes:
-##                            if options.verbose:    
-##                                print "[DB-I] %s | %s | %s | R~" % (str(d.q.qname),item.rdata,item.ttl) #DB Route exists, do nothing ("R~")
-##                        else:
-##                            if options.verbose:
-##                                print "[DB-I] %s | %s | %s | R+" % (str(d.q.qname),item.rdata,item.ttl) #DB Adding route ("R+")
-##                            interface=str(isInteresting[1])
-##                            existingroutes.append(str(item.rdata))
-##                            command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addroutetorule.sh " + str(item.rdata) + " " + str(interface)
-##                            os.system(command)
-##                    else:
-##                        if options.verbose:
-##                            print "[DB] %s | %s | %s | NR" % (str(d.q.qname),item.rdata,item.ttl) #DB No modifications ("NR")
-##            response = d.pack()
-
-        return response         
-    
-
-    # Find appropriate ip address to use for a queried name. The function can 
-    def findnametodns(self,qname,nametodns):
-    
-        # Split and reverse qname into components for matching.
-        qnamelist = qname.split('.')
-        qnamelist.reverse()
-    
-        # HACK: It is important to search the nametodns dictionary before iterating it so that
-        # global matching ['*.*.*.*.*.*.*.*.*.*'] will match last. Use sorting for that.
-        for domain,host in sorted(nametodns.iteritems(), key=operator.itemgetter(1)):
-            domain = domain.split('.')
-            domain.reverse()
             
-            # Compare domains in reverse.
-            for a,b in map(None,qnamelist,domain):
-                if a != b and b != "*":
-                    break
-            else:
-                # Could be a real IP or False if we are doing reverse matching with 'truedomains'
-                return host
-        else:
-            return False
-    
+        return response         
+        
     # Obtain a response from a real DNS server.
     def proxyrequest(self, request, host, port="53"):       
         reply = None
@@ -230,6 +171,10 @@ def isInterestingDomain(input_dict, searchstr):
 def isRegularDomain(regularDomains, domain):
     extracted = tldextract.extract(str(domain))
     tld = extracted.domain + "." + extracted.suffix
+    if len(extracted.subdomain) > 0:
+        full = extracted.subdomain + "." + tld
+    else:
+        full = tld
 
     for regular in regularDomains:
         if len(regular) == 0: continue
@@ -238,12 +183,12 @@ def isRegularDomain(regularDomains, domain):
             regular = regular[1:]
             # Use TLD to match
             if regular == tld:
-                print "[ ] TLD style match for \"%s\" against \"%s\". Will route normally" % (domain, regular)
+                print "[ ] TLD style match for \"%s\" against \"%s\". Will route normally" % (full, regular)
                 return True
         else:
             # Use exact match
-            if regular == domain:
-                    print "[ ] Exact  match for \"%s\" against \"%s\". Will route normally" % (domain, regular)
+            if regular == full:
+                    print "[ ] Exact  match for \"%s\" against \"%s\". Will route normally" % (full, regular)
                     return True
         
     return False
