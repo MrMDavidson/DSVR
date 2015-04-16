@@ -68,7 +68,7 @@ class DNSHandler():
                 return response
 
             d = DNSRecord.parse(response)
-
+           
             for item in d.rr:               
                 try:
                     socket.inet_aton(str(item.rdata))
@@ -83,6 +83,11 @@ class DNSHandler():
                 print "[DB+] Adding %s via  \"%s\"" % (str(item.rdata), command)
                 os.system(command)
                 added_routes.append(str(item.rdata))
+
+                if self.server.ttloverride != -1:
+                    print "[ ] DNS response has a TTL of %r. Will override to %r" % (item.ttl , min(self.server.ttloverride, item.ttl) )
+                    item.ttl = min(self.server.ttloverride, item.ttl)
+
 
             response = d.pack()
             
@@ -139,13 +144,18 @@ class TCPHandler(DNSHandler, SocketServer.BaseRequestHandler):
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
     # Override SocketServer.UDPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, ttloverride):
         self.nametodns  = nametodns
         self.nameservers = nameservers
+        self.ttloverride = ttloverride
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
 
-        SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass) 
+        SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass)
+
+    @property
+    def ttloverride(self):
+        return self.ttloverride
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     
@@ -153,13 +163,18 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     allow_reuse_address = True
 
     # Override SocketServer.TCPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, ttloverride):
         self.nametodns  = nametodns
         self.nameservers = nameservers
+        self.ttloverride = ttloverride
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
 
         SocketServer.TCPServer.__init__(self,server_address,RequestHandlerClass) 
+
+    @property
+    def ttloverride(self):
+        return self.ttloverride
 
 def isInterestingDomain(input_dict, searchstr):
     for index in input_dict:
@@ -210,13 +225,13 @@ def getRegularTrafficDomains(trafficFilePath):
     return domains 
         
 # Initialize and start dsvr        
-def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53"):
+def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53", ttloverride=-1):
     try:
         if tcp:
             print "[*] dsvr is running in TCP mode"
-            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, nameservers, ipv6)
+            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, nameservers, ipv6, ttloverride)
         else:
-            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, nameservers, ipv6)
+            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, nameservers, ipv6, ttloverride)
 
         # Start a thread with the server -- that thread will then start one
         # more threads for each request
@@ -299,7 +314,11 @@ if __name__ == "__main__":
         db_dns_vpn_server.append(config.get('Global','dns-vpn-server'))
         print "[*] Using the following nameservers for interesting domains: %s" % ", ".join(db_dns_vpn_server)
         db_ttl_override_value = config.get('Global','ttl-override-value')
-        print "[*] TTL overide value for interesting domains: %s" % db_ttl_override_value
+        if db_ttl_override_value != None:
+            db_ttl_override_value = int(db_ttl_override_value)
+            print "[*] TTL overide value for interesting domains: %i" % db_ttl_override_value
+        else:
+            db_ttl_override_value = -1
                                 
     print "[*] Clearing existing IP Rules"
     command = os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/iprule-clear-table.sh "
@@ -317,5 +336,6 @@ if __name__ == "__main__":
 ##            os.system(command)
    
     # Launch dsvr
-    start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp, ipv6=options.ipv6, port=options.port)
+    start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp, ipv6=options.ipv6, port=options.port, ttloverride=db_ttl_override_value)
+
 

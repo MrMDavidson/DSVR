@@ -1,6 +1,7 @@
 news.internode.on.net
 .facebook.com
 .icanhazip.com
+.jsonip.com
 .live.com
 .facebook.com
 .google.com
@@ -10,4 +11,14 @@ news.internode.on.net
 .twimg.com
 .google-analytics.com
 fbcdn-profile-a.akamihd.net
+.bing.com
+.msn.com
+.microsoft.com
+.windowsupdate.com
+.s-msn.com
+.msn.com
+.windowssearch.com
+.plex.tv
+.msocsp.com
+.onedrive.com
 
