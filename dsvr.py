@@ -52,6 +52,8 @@ class DNSHandler():
 
         # Proxy the request
         else:
+            print "[ ] %s wants to look up %s" % (self.client_address[0], str(d.q.qname))
+            
             isRegular = False
                     
             if isRegularDomain(regulardomains, str(d.q.qname)) == True:
