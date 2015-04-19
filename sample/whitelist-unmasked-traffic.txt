@@ -1,0 +1,7 @@
+# Domains starting with a . are a TLD style match. Any subdomain will match
+.google.com
+
+# Domains not starting with a . are an an exact match
+.facebook.com
+fbcdn-profile-a.akamihd.net
+

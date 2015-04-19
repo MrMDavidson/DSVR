@@ -1,0 +1,2 @@
+# Domains starting with a "." are a TLD match. Any subdomains will match
+.netflix.com
