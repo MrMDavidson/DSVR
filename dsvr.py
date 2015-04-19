@@ -54,19 +54,14 @@ class DNSHandler():
         else:
             print "[ ] %s wants to look up %s" % (self.client_address[0], str(d.q.qname))
             
-            isRegular = False
-                    
-            if isRegularDomain(regulardomains, str(d.q.qname)) == True:
-                nameserver_tuple = random.choice(self.server.nameservers).split('#')
-                isRegular = True
-            else:
-                nameserver_tuple = random.choice(db_dns_vpn_server).split('#') 
+            network = getRelevantNetwork(fallback, networks, str(d.q.qname))
+            nameserver_tuple = random.choice(network.dnsservers).split('#')
 
-            print "[ ] \"%s\" is considered a %s domain. Looking up via %s" % (d.q.qname, "regular" if isRegular == True else "VPN", nameserver_tuple[0] )
+            print "[ ] \"%s\" will route via %s. Looking up via %s" % (d.q.qname, network.devicename, nameserver_tuple[0] )
                
             response = self.proxyrequest(data,*nameserver_tuple)
-
-            if isRegular == False:
+            
+            if network.isfallback == True:
                 return response
 
             d = DNSRecord.parse(response)
@@ -86,9 +81,9 @@ class DNSHandler():
                 os.system(command)
                 added_routes.append(str(item.rdata))
 
-                if self.server.ttloverride != -1:
-                    print "[ ] DNS response has a TTL of %r. Will override to %r" % (item.ttl , min(self.server.ttloverride, item.ttl) )
-                    item.ttl = min(self.server.ttloverride, item.ttl)
+                if network.ttloverride != -1:
+                    print "[ ] DNS response has a TTL of %r. Will override to %r" % (item.ttl , min(network.ttloverride, item.ttl) )
+                    item.ttl = min(network.ttloverride, item.ttl)
 
 
             response = d.pack()
@@ -146,18 +141,14 @@ class TCPHandler(DNSHandler, SocketServer.BaseRequestHandler):
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
     # Override SocketServer.UDPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, ttloverride):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, fallback, networks, ipv6):
         self.nametodns  = nametodns
-        self.nameservers = nameservers
-        self.ttloverride = ttloverride
+        self.fallback = fallback
+        self.networks = networks
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
 
         SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass)
-
-    @property
-    def ttloverride(self):
-        return self.ttloverride
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     
@@ -165,7 +156,7 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     allow_reuse_address = True
 
     # Override SocketServer.TCPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, ttloverride):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, fallback, networks, ipv6):
         self.nametodns  = nametodns
         self.nameservers = nameservers
         self.ttloverride = ttloverride
@@ -186,6 +177,33 @@ def isInterestingDomain(input_dict, searchstr):
                 return list
     list = [0]
     return list
+
+def getRelevantNetwork(fallback, networks, domain):
+    extracted = tldextract.extract(str(domain))
+    tld = extracted.domain + "." + extracted.suffix
+    if len(extracted.subdomain) > 0:
+        full = extracted.subdomain + "." + tld
+    else:
+        full = tld
+
+    for network in networks:
+        for regular in network.domains:
+            if len(regular) == 0: continue
+            
+            if regular[0] == ".":
+                regular = regular[1:]
+                # Use TLD to match
+                if regular == tld:
+                    print "[ ] TLD style match for \"%s\" against \"%s\". Will route via %s" % (full, regular, network.devicename)
+                    return network
+            else:
+                # Use exact match
+                if regular == full:
+                        print "[ ] Exact  match for \"%s\" against \"%s\". Will route via %s" % (full, regular, network.devicename)
+                        return network
+        
+    return fallback
+    
 
 def isRegularDomain(regularDomains, domain):
     extracted = tldextract.extract(str(domain))
@@ -227,13 +245,13 @@ def getRegularTrafficDomains(trafficFilePath):
     return domains 
         
 # Initialize and start dsvr        
-def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port="53", ttloverride=-1):
+def start_cooking(interface, nametodns, fallback, networks, tcp=False, ipv6=False, port="53"):
     try:
         if tcp:
             print "[*] dsvr is running in TCP mode"
-            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, nameservers, ipv6, ttloverride)
+            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, fallback, networks, ipv6)
         else:
-            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, nameservers, ipv6, ttloverride)
+            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, fallback, networks, ipv6)
 
         # Start a thread with the server -- that thread will then start one
         # more threads for each request
@@ -249,6 +267,46 @@ def start_cooking(interface, nametodns, nameservers, tcp=False, ipv6=False, port
         server.shutdown()
         print "[*] dsvr is shutting down."
         sys.exit()
+
+class NetworkInfo:
+    def __init__(self, dnsservers, domainlistfile, devicename, ttloverride, isfallback = False):
+        self._dnsservers = dnsservers
+        self._devicename = devicename
+        self._ttloverride = ttloverride
+        self._isfallback = isfallback
+
+        if domainlistfile != None:
+            file = open(domainlistfile, 'r')
+            self._domains = []
+            for line in file:
+                line = line.rstrip()
+                if len(line) == 0: continue
+                if line[0] == '#': continue
+                print "[ ] Have rule for \"%s\"" % line
+
+                self._domains.append(line)
+
+            file.close()
+
+    @property
+    def dnsservers(self):
+        return self._dnsservers
+
+    @property
+    def domains(self):
+        return self._domains
+
+    @property
+    def devicename(self):
+        return self._devicename
+
+    @property
+    def ttloverride(self):
+        return self._ttloverride
+
+    @property
+    def isfallback(self):
+        return self._isfallback
     
 if __name__ == "__main__":
 
@@ -281,11 +339,6 @@ if __name__ == "__main__":
     if options.verbose:
         print header
 
-    if options.regulardomains is None:
-        print "Must specify a file containing a list of regular domains to route via the unenecrypted link"
-        sys.exit()
-
-    regulardomains = getRegularTrafficDomains(options.regulardomains) 
     db_dns_vpn_server = []
     db_dns_upstream_server = []
     added_routes = []
@@ -309,18 +362,55 @@ if __name__ == "__main__":
             options.file = os.path.abspath(os.path.dirname(sys.argv[0])) + "/" + options.file
         config.read(options.file)
         print "[*] Using external config file: %s" % options.file
-            
-        db_dns_upstream_server.append(config.get('Global','dns-upstream-server'))
-        print "[*] Using the following nameservers for un-interesting domains: %s" % ", ".join(db_dns_upstream_server)
-        nameservers = db_dns_upstream_server
-        db_dns_vpn_server.append(config.get('Global','dns-vpn-server'))
-        print "[*] Using the following nameservers for interesting domains: %s" % ", ".join(db_dns_vpn_server)
-        db_ttl_override_value = config.get('Global','ttl-override-value')
-        if db_ttl_override_value != None:
-            db_ttl_override_value = int(db_ttl_override_value)
-            print "[*] TTL overide value for interesting domains: %i" % db_ttl_override_value
+
+        fallbackdnsservers = []
+        fallbackdnsservers.append(config.get('Global', 'dns-server'))
+        if config.has_option("Global", "ttl-override") == False:
+            fallbackttloverride = -1
         else:
-            db_ttl_override_value = -1
+            fallbackttloverride = config.getint('Global', 'ttl-override')           
+
+        fallback = NetworkInfo(fallbackdnsservers, None, 'Global', fallbackttloverride, True)
+        
+        #db_dns_upstream_server.append(config.get('Global','dns-upstream-server'))
+        #print "[*] Using the following nameservers for un-interesting domains: %s" % ", ".join(db_dns_upstream_server)
+        #nameservers = db_dns_upstream_server
+        #db_dns_vpn_server.append(config.get('Global','dns-vpn-server'))
+        #print "[*] Using the following nameservers for interesting domains: %s" % ", ".join(db_dns_vpn_server)
+        #db_ttl_override_value = config.get('Global','ttl-override-value')
+        #if db_ttl_override_value != None:
+            #db_ttl_override_value = int(db_ttl_override_value)
+            #print "[*] TTL overide value for interesting domains: %i" % db_ttl_override_value
+        #else:
+            #db_ttl_override_value = -1
+
+        networks = []
+
+        for section in config.sections():
+            if section.startswith("network-") == False:
+                continue
+            networkname = section.replace("network-", "")
+            print "File has section \"%s\" => %s" % ( section, networkname)
+
+            device = config.get(section, "device")
+            if config.has_option(section, "dns-server") == False:
+                print "[WARN] DNS Server for %s is not set. Will use default of %s. This may allow your DNS requests to leak" % (networkname, ", ".join(fallbackdnsservers))
+                dnsservers = fallbackdnsservers
+            else:
+                dnsservers = []
+                dnsservers.append(config.get(section, "dns-server"))
+                print "[ ] %s will look up via %s" % (networkname, ", ".join(dnsservers))
+
+            if config.has_option(section, "ttl-override") == False:
+                print "[INFO] TTL override for %s is not set. Will use default of %i" % (section, fallbackttloverride)
+                ttloverride = fallbackttloverride
+            else:
+                ttloverride = config.get(section, "ttl-override")
+                            
+            whitelistpath = config.get(section, "whitelist")
+
+            current = NetworkInfo(dnsservers, whitelistpath, device, ttloverride)
+            networks.append(current)
                                 
     print "[*] Clearing existing IP Rules"
     command = os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/iprule-clear-table.sh "
@@ -338,6 +428,6 @@ if __name__ == "__main__":
 ##            os.system(command)
    
     # Launch dsvr
-    start_cooking(interface=options.interface, nametodns=nametodns, nameservers=nameservers, tcp=options.tcp, ipv6=options.ipv6, port=options.port, ttloverride=db_ttl_override_value)
+    start_cooking(interface=options.interface, nametodns=nametodns, fallback=fallback, networks=networks, tcp=options.tcp, ipv6=options.ipv6, port=options.port)
 
 
