@@ -59,7 +59,7 @@ class DNSHandler():
 
             print "[ ] \"%s\" will route via %s. Looking up via %s" % (d.q.qname, network.devicename, nameserver_tuple[0] )
                
-            response = self.proxyrequest(data,*nameserver_tuple)
+            response = self.proxyrequest(data, network.timeout, *nameserver_tuple)
             
             if network.isfallback == True:
                 return response
@@ -91,7 +91,7 @@ class DNSHandler():
         return response         
         
     # Obtain a response from a real DNS server.
-    def proxyrequest(self, request, host, port="53"):       
+    def proxyrequest(self, request, timeout, host, port="53"):       
             reply = None
             try:
                     if self.server.ipv6:
@@ -99,7 +99,8 @@ class DNSHandler():
                     else:
                             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-                    sock.settimeout(3.0)
+                    if timeout != None and timeout > 0:
+                        sock.settimeout(timeout)
 
                     # Send the proxy request to a randomly chosen DNS server
                     sock.sendto(request, (host, int(port)))
@@ -147,6 +148,8 @@ class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         self.networks = networks
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
+
+        print "Firing up on %r" % str(server_address)
 
         SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass)
 
@@ -269,11 +272,12 @@ def start_cooking(interface, nametodns, fallback, networks, tcp=False, ipv6=Fals
         sys.exit()
 
 class NetworkInfo:
-    def __init__(self, dnsservers, domainlistfile, devicename, ttloverride, isfallback = False):
+    def __init__(self, dnsservers, domainlistfile, devicename, ttloverride, timeout, isfallback = False):
         self._dnsservers = dnsservers
         self._devicename = devicename
         self._ttloverride = ttloverride
         self._isfallback = isfallback
+        self._timeout = timeout
 
         if domainlistfile != None:
             file = open(domainlistfile, 'r')
@@ -307,6 +311,10 @@ class NetworkInfo:
     @property
     def isfallback(self):
         return self._isfallback
+
+    @property
+    def timeout(self):
+        return self._timeout
     
 if __name__ == "__main__":
 
@@ -368,9 +376,13 @@ if __name__ == "__main__":
         if config.has_option("Global", "ttl-override") == False:
             fallbackttloverride = -1
         else:
-            fallbackttloverride = config.getint('Global', 'ttl-override')           
+            fallbackttloverride = config.getint('Global', 'ttl-override')
+        if config.has_option("Global", "dns-timeout") == False:
+            fallbackdnstimeout = -1
+        else:
+            fallbackdnstimeout = config.getint("Global", "dns-timeout")
 
-        fallback = NetworkInfo(fallbackdnsservers, None, 'Global', fallbackttloverride, True)
+        fallback = NetworkInfo(fallbackdnsservers, None, 'Global', fallbackttloverride, fallbackdnstimeout, True)
         
         #db_dns_upstream_server.append(config.get('Global','dns-upstream-server'))
         #print "[*] Using the following nameservers for un-interesting domains: %s" % ", ".join(db_dns_upstream_server)
@@ -405,11 +417,17 @@ if __name__ == "__main__":
                 print "[INFO] TTL override for %s is not set. Will use default of %i" % (section, fallbackttloverride)
                 ttloverride = fallbackttloverride
             else:
-                ttloverride = config.get(section, "ttl-override")
+                ttloverride = config.getint(section, "ttl-override")
+                
+            if config.has_option(section, "dns-timeout") == False:
+                print "[INFO] DNS timeout for %s is not set. Will use default of %i" % (section, fallbackdnstimeout)
+                dnstimeout = fallbackdnstimeout
+            else:
+                dnstimeout = config.getint(section, "dns-timeout")
                             
             whitelistpath = config.get(section, "whitelist")
 
-            current = NetworkInfo(dnsservers, whitelistpath, device, ttloverride)
+            current = NetworkInfo(dnsservers, whitelistpath, device, ttloverride, dnstimeout)
             networks.append(current)
                                 
     print "[*] Clearing existing IP Rules"
