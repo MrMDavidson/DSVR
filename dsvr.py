@@ -279,17 +279,15 @@ if __name__ == "__main__":
     parser = OptionParser(usage = "dsvr.py [options]:\n" + header, description="" )
     
     fakegroup = OptionGroup(parser, "Fake DNS records:")
-
     fakegroup.add_option('--file', action="store", help="Specify a file containing a list of DOMAIN=IP pairs (one pair per line) used for DNS responses. For example: google.com=1.1.1.1 will force all queries to 'google.com' to be resolved to '1.1.1.1'. IPv6 addresses will be automatically detected. You can be even more specific by combining --file with other arguments. However, data obtained from the file will take precedence over others.")
    
     rungroup = OptionGroup(parser,"Optional runtime parameters.")
     rungroup.add_option("--nameservers", metavar="8.8.8.8#53 or 2001:4860:4860::8888", default='8.8.8.8', action="store", help='A comma separated list of alternative DNS servers to use with proxied requests. Nameservers can have either IP or IP#PORT format. A randomly selected server from the list will be used for proxy requests when provided with multiple servers. By default, the tool uses Google\'s public DNS server 8.8.8.8 when running in IPv4 mode and 2001:4860:4860::8888 when running in IPv6 mode.')
-    rungroup.add_option("-i","--interface", metavar="127.0.0.1 or ::1", default="127.0.0.1", action="store", help='Define an interface to use for the DNS listener. By default, the tool uses 127.0.0.1 for IPv4 mode and ::1 for IPv6 mode.')
+    rungroup.add_option("-i","--interface", metavar="0.0.0.0 or ::1", action="store", help='Define an interface to use for the DNS listener. By default, the tool uses 0.0.0.0 for IPv4 mode and ::1 for IPv6 mode.')
     rungroup.add_option("-t","--tcp", action="store_true", default=False, help="Use TCP DNS proxy instead of the default UDP.")
     rungroup.add_option("-6","--ipv6", action="store_true", default=False, help="Run in IPv6 mode.")
     rungroup.add_option("-p","--port", action="store", metavar="53", default="53", help='Port number to listen for DNS requests.')
     rungroup.add_option("-q", "--quiet", action="store_false", dest="verbose", default=True, help="Don't show headers.")
-    rungroup.add_option("-r", "--regulardomains", action="store", help="Path to a new line separated list of domains to skip the VPN")
     parser.add_option_group(rungroup)
 
     (options,args) = parser.parse_args()
@@ -332,6 +330,14 @@ if __name__ == "__main__":
             fallbackdnstimeout = -1
         else:
             fallbackdnstimeout = config.getint("Global", "dns-timeout")
+
+        if config.has_option("Global", "server-listen-ip") == True:
+            if options.interface:
+                print "[ ] Interface was specified in INI file as %s but overriden on the command line to %s" % (config.get("Global", "server-listen-ip"), options.interface)
+            else:
+                print "[ ] Interface was specified in INI file as %s" % config.get("Global", "server-listen-ip")
+                options.interface = config.get("Global", "server-listen-ip")
+                
 
         fallback = NetworkInfo(fallbackdnsservers, None, 'Global', fallbackttloverride, fallbackdnstimeout, True)
         
