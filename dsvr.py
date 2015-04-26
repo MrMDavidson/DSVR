@@ -99,7 +99,7 @@ class DNSHandler():
                     else:
                             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-                    sock.setsockopt(socket.SOL_SOCKET, 25, device)
+                    #sock.setsockopt(socket.SOL_SOCKET, 25, device)
 
                     if timeout != None and timeout > 0:
                         sock.settimeout(timeout)
@@ -150,8 +150,6 @@ class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         self.networks = networks
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
-
-        print "Firing up on %r" % str(server_address)
 
         SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass)
 
@@ -342,18 +340,6 @@ if __name__ == "__main__":
                 
 
         fallback = NetworkInfo(fallbackdnsservers, None, 'Global', fallbackttloverride, fallbackdnstimeout, True)
-        
-        #db_dns_upstream_server.append(config.get('Global','dns-upstream-server'))
-        #print "[*] Using the following nameservers for un-interesting domains: %s" % ", ".join(db_dns_upstream_server)
-        #nameservers = db_dns_upstream_server
-        #db_dns_vpn_server.append(config.get('Global','dns-vpn-server'))
-        #print "[*] Using the following nameservers for interesting domains: %s" % ", ".join(db_dns_vpn_server)
-        #db_ttl_override_value = config.get('Global','ttl-override-value')
-        #if db_ttl_override_value != None:
-            #db_ttl_override_value = int(db_ttl_override_value)
-            #print "[*] TTL overide value for interesting domains: %i" % db_ttl_override_value
-        #else:
-            #db_ttl_override_value = -1
 
         networks = []
 
