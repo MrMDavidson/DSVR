@@ -172,15 +172,6 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     def ttloverride(self):
         return self.ttloverride
 
-def isInterestingDomain(input_dict, searchstr):
-    for index in input_dict:
-        for item in input_dict[index]:
-            if item in searchstr:
-                list = [1,index]
-                return list
-    list = [0]
-    return list
-
 def getRelevantNetwork(fallback, networks, domain):
     extracted = tldextract.extract(str(domain))
     tld = extracted.domain + "." + extracted.suffix
@@ -206,46 +197,6 @@ def getRelevantNetwork(fallback, networks, domain):
                         return network
         
     return fallback
-    
-
-def isRegularDomain(regularDomains, domain):
-    extracted = tldextract.extract(str(domain))
-    tld = extracted.domain + "." + extracted.suffix
-    if len(extracted.subdomain) > 0:
-        full = extracted.subdomain + "." + tld
-    else:
-        full = tld
-
-    for regular in regularDomains:
-        if len(regular) == 0: continue
-        
-        if regular[0] == ".":
-            regular = regular[1:]
-            # Use TLD to match
-            if regular == tld:
-                print "[ ] TLD style match for \"%s\" against \"%s\". Will route normally" % (full, regular)
-                return True
-        else:
-            # Use exact match
-            if regular == full:
-                    print "[ ] Exact  match for \"%s\" against \"%s\". Will route normally" % (full, regular)
-                    return True
-        
-    return False
-
-def getRegularTrafficDomains(trafficFilePath):
-    file = open(trafficFilePath, 'r')
-    domains = []
-    for line in file:
-        line = line.rstrip()
-        if len(line) == 0: continue
-        print "[ ] Have rule for \"%s\"" % line
-
-        domains.append(line)
-
-    file.close()
-
-    return domains 
         
 # Initialize and start dsvr        
 def start_cooking(interface, nametodns, fallback, networks, tcp=False, ipv6=False, port="53"):
