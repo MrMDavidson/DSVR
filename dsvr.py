@@ -59,7 +59,7 @@ class DNSHandler():
 
             print "[ ] \"%s\" will route via %s. Looking up via %s" % (d.q.qname, network.devicename, nameserver_tuple[0] )
                
-            response = self.proxyrequest(data, network.timeout, *nameserver_tuple)
+            response = self.proxyrequest(data, network.devicename, network.timeout, *nameserver_tuple)
             
             if network.isfallback == True:
                 return response
@@ -76,7 +76,7 @@ class DNSHandler():
                     print "[DB] Have previously added %s. Skipping" % str(item.rdata)
                     continue
 
-                command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addregularroute.sh " + str(item.rdata)
+                command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addregularroute.sh " + str(item.rdata) + " " + network.devicename
                 print "[DB+] Adding %s via  \"%s\"" % (str(item.rdata), command)
                 os.system(command)
                 added_routes.append(str(item.rdata))
@@ -91,13 +91,15 @@ class DNSHandler():
         return response         
         
     # Obtain a response from a real DNS server.
-    def proxyrequest(self, request, timeout, host, port="53"):       
+    def proxyrequest(self, request, device, timeout, host, port="53"):       
             reply = None
             try:
                     if self.server.ipv6:
                             sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
                     else:
                             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+                    sock.setsockopt(socket.SOL_SOCKET, 25, device)
 
                     if timeout != None and timeout > 0:
                         sock.settimeout(timeout)
@@ -392,15 +394,13 @@ if __name__ == "__main__":
     os.system(command)
     
     # Add selected DNS servers to route via the VPN
-##    if interestingdomainsng:
-##        for interfacename in interestingdomainsng:
-##            intname = interfacename
-##            break 
-## 
-##        for item in db_dns_vpn_server:
-##            print "[*] Routing DNS server (%s) via first specificed int (%s)" % (item, intname)
-##            command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addroutetorule.sh " + item + " " + intname #DB
-##            os.system(command)
+    for network in networks:
+        for server in network.dnsservers:
+            print "[*] Adding route for %s via %s" % (server, network.devicename)
+
+            command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addregularroute.sh " + server + " " + network.devicename
+            print "[ ] Calling %s" % ( command )
+            os.system(command)
    
     # Launch dsvr
     start_cooking(interface=options.interface, nametodns=nametodns, fallback=fallback, networks=networks, tcp=options.tcp, ipv6=options.ipv6, port=options.port)
