@@ -37,6 +37,7 @@ import threading, random, operator, time
 import SocketServer, socket, sys, os, re
 import tldextract,commands
 import binascii
+import netifaces
 
 class DNSHandler():
            
@@ -76,7 +77,7 @@ class DNSHandler():
                     print "[DB] Have previously added %s. Skipping" % str(item.rdata)
                     continue
 
-                command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addregularroute.sh " + str(item.rdata) + " " + network.devicename
+                command = network.addroutecommand(str(item.rdata))
                 print "[DB+] Adding %s via  \"%s\"" % (str(item.rdata), command)
                 os.system(command)
                 added_routes.append(str(item.rdata))
@@ -223,12 +224,13 @@ def start_cooking(interface, nametodns, fallback, networks, tcp=False, ipv6=Fals
         sys.exit()
 
 class NetworkInfo:
-    def __init__(self, dnsservers, domainlistfile, devicename, ttloverride, timeout, isfallback = False):
+    def __init__(self, dnsservers, domainlistfile, devicename, ttloverride, timeout, devicegateway = '', isfallback = False):
         self._dnsservers = dnsservers
         self._devicename = devicename
         self._ttloverride = ttloverride
         self._isfallback = isfallback
         self._timeout = timeout
+        self._devicegateway = devicegateway
 
         if domainlistfile != None:
             file = open(domainlistfile, 'r')
@@ -266,6 +268,13 @@ class NetworkInfo:
     @property
     def timeout(self):
         return self._timeout
+
+    @property
+    def devicegateway(self):
+        return self._devicegateway
+
+    def addroutecommand(self, address):
+        return "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addregularroute.sh " + address + " " + self.devicename + " " + self.devicegateway
     
 if __name__ == "__main__":
 
@@ -318,7 +327,7 @@ if __name__ == "__main__":
         if "/" not in options.file:
             options.file = os.path.abspath(os.path.dirname(sys.argv[0])) + "/" + options.file
         config.read(options.file)
-        print "[*] Using external config file: %s" % options.file
+        print "[*] Using external econfig file: %s" % options.file
 
         fallbackdnsservers = []
         fallbackdnsservers.append(config.get('Global', 'dns-server'))
@@ -339,9 +348,10 @@ if __name__ == "__main__":
                 options.interface = config.get("Global", "server-listen-ip")
                 
 
-        fallback = NetworkInfo(fallbackdnsservers, None, 'Global', fallbackttloverride, fallbackdnstimeout, True)
+        fallback = NetworkInfo(fallbackdnsservers, None, 'Global', fallbackttloverride, fallbackdnstimeout, None, True)
 
         networks = []
+        inetgateways = netifaces.gateways()[netifaces.AF_INET]
 
         for section in config.sections():
             if section.startswith("network-") == False:
@@ -350,6 +360,16 @@ if __name__ == "__main__":
             print "File has section \"%s\" => %s" % ( section, networkname)
 
             device = config.get(section, "device")
+            
+            for gateway in inetgateways:
+                if gateway[1] == device:
+                    devicegateway = gateway[0]
+
+            if devicegateway == None:
+                print "[WARN] Routes added for %s will not have a gateway set. This may cause issues" % device
+            else:
+                print "[ ] Routes added for %s will travel via %s" % (device, devicegateway)
+            
             if config.has_option(section, "dns-server") == False:
                 print "[WARN] DNS Server for %s is not set. Will use default of %s. This may allow your DNS requests to leak" % (networkname, ", ".join(fallbackdnsservers))
                 dnsservers = fallbackdnsservers
@@ -372,7 +392,7 @@ if __name__ == "__main__":
                             
             whitelistpath = config.get(section, "whitelist")
 
-            current = NetworkInfo(dnsservers, whitelistpath, device, ttloverride, dnstimeout)
+            current = NetworkInfo(dnsservers, whitelistpath, device, ttloverride, dnstimeout, devicegateway)
             networks.append(current)
                                 
     print "[*] Clearing existing IP Rules"
@@ -384,7 +404,7 @@ if __name__ == "__main__":
         for server in network.dnsservers:
             print "[*] Adding route for %s via %s" % (server, network.devicename)
 
-            command = "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addregularroute.sh " + server + " " + network.devicename
+            command = network.addroutecommand(server)
             print "[ ] Calling %s" % ( command )
             os.system(command)
    
