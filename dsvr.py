@@ -394,13 +394,13 @@ if __name__ == "__main__":
 
             current = NetworkInfo(dnsservers, whitelistpath, device, ttloverride, dnstimeout, devicegateway)
             networks.append(current)
-                                
-    print "[*] Clearing existing IP Rules"
-    command = os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/iprule-clear-table.sh "
-    os.system(command)
-    
+                                    
     # Add selected DNS servers to route via the VPN
     for network in networks:
+        print "[*] Clearing existing IP Rules for %s" % network.devicename
+        command = os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/iprule-clear-table.sh " + network.devicename
+        os.system(command)
+        
         for server in network.dnsservers:
             print "[*] Adding route for %s via %s" % (server, network.devicename)
 

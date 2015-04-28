@@ -18,5 +18,6 @@
 # either express or implied. See the License for the specific 
 # language governing permissions and limitations under the License.
 
-ip route flush table eth0
-ip route flush table tun0
+DEVNAME=$1
+
+ip route flush table $DEVNAME
