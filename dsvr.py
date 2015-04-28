@@ -274,7 +274,7 @@ class NetworkInfo:
         return self._devicegateway
 
     def addroutecommand(self, address):
-        return "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/addregularroute.sh " + address + " " + self.devicename + " " + self.devicegateway
+        return "sudo " + os.path.abspath(os.path.dirname(sys.argv[0])) + "/scripts/iprule-add-route.sh " + address + " " + self.devicename + " " + self.devicegateway
     
 if __name__ == "__main__":
 
