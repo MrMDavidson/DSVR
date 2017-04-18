@@ -30,6 +30,14 @@ Please review my blog post here http://darranboyd.wordpress.com/2013/07/05/selec
 3) User specified DNS server for per-site DNS queries, for privacy from your ISP.  
 4) Port Forwarding & uPnP on existing router/AP not affected (see TODO)  
 
+## HOW IT WORKS
+
+DSVR works by functioning as a nameserver on your network. Other machines on your network should use the DSVR machine as both their nameserver and default gateway. When a machine on your network wants to visit a site (Eg. ussite1.com) it will ask DSVR to resolve the address. To do this DSVR will check to see if it knows about ussite1.com. In our example above it sees that it needs to go via your United States based VPN as such it performs name resolution via your US based VPN's nameserver, adds a routing table entry on the DSVR machine for all the relevant ussite1.com IP addresses to go via the US based VPN's network device and forwards the resolution results back to the client machine. As the DSVR machine is configured as the default gateway when the client requests data from ussite1.com it'll be sent via the DSVR machine which will use the newly added routing tables to send the traffic over the appropraite VPN link.
+
+If a machine on your network looks up asitenotinyourconfiguration.com DSVR will see that it has no record for this domain. As such it'll use your default nameserver to resolve the details of the domain and forward the results back to the requesting machine. It will not add an entry to your routing table. When the machine then tries to send traffic to asitenotinyourconfiguration.com the DSVR machine will receive the request and it will be handled via the default route on the DSVR machine (eg. Your standarad link to the internet).
+
+The key parts here are that DSVR acts as a nameserver on your network and relies on other machines having the DSVR machine configured as both the nameserver and the default gateway.
+
 ## PRE-REQUISTES
 
 1) A working Linux distribution
