@@ -1,4 +1,4 @@
-###DSVR (Domain-Specific VPN Router)###
+### DSVR (Domain-Specific VPN Router)###
 
 **PURPOSE**
 
@@ -32,8 +32,6 @@ Please review my blog post here http://darranboyd.wordpress.com/2013/07/05/selec
 6) Port Forwarding & uPnP on existing router/AP not affected (see TODO)  
 7) CLI access via SSH  
 8) Web administration portal 
-
-![SCREENSHOT] (https://raw.github.com/dboyd13/DSVR/master/screenshots/webadmin.png)
 
 **PRE-REQUISTES**
 
@@ -79,6 +77,7 @@ New components required:
 13) With the power-off, plug the USB NIC into an available USB port.  
 14) Wire your RPI inline between your existing Modem/CE and your existing Router/Access Point as follows:  
 
+```
     eth0 (onboard) is 'internet side'
     eth1 (usb) is 'lan side'
 
@@ -101,6 +100,7 @@ New components required:
                eth0 (onboard)         Web admin server
                   DHCP Client         SSH server
                    NAT (Hide)         VPN gateway
+```
 
 15) Power-up the RPi, whilst it's booting power-down and power-up both your Modem/CE and your Router/Access Point  
 16) Wait a while for things to come up, I'd guess around 3-5mins  
