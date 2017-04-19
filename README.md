@@ -46,8 +46,7 @@ The key parts here are that DSVR acts as a nameserver on your network and relies
 
 ## KNOWN LIMITATIONS
 
-1) Theoretical 100mbit/s - likely less due to RPi using USB bus.  
-2) Cannot perform source-based VPN routing without removal of existing NAT boundary, so that real sources can be determined. (see WIKI for workaround)
+1) Cannot perform source-based VPN routing without removal of existing NAT boundary, so that real sources can be determined. (see WIKI for workaround)
 
 ## TESTED WITH
 
@@ -62,11 +61,9 @@ Once you have your machine set up and runnig you'll want to install DSVR.
 
 ## CONFIGURATION
 
-The majority of your configuration is done via editing your `dsvr.ini` file. This is broken into two sets of sections;
+The majority of your configuration is done via editing your `dsvr.ini` file. This is broken into two sets of sections a "global" section and a series of network specific sections.
 
-### Global
-
-Global configuration consits of default settings that specific network configurations inherit as well as some non-network specific settings;
+### SETTINGS OVERVIEW
 
 | Setting          | Global | Applies to network | Meaning                                                                                                                                             |
 |------------------|-------:|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -76,6 +73,41 @@ Global configuration consits of default settings that specific network configura
 | server-listen-ip | Yes    | No                 | Address to listen to DNS requests on. If absent will use 0.0.0.0 (ie. all interfaces)                                                               |
 | device           | No     | Yes                | Device to route matching requests over                                                                                                              |
 | whitelist        | No     | Yes                | Path to a file containing list of entries that should be routed via this network                                                                    |
+
+### GLOBAL SETTINGS
+
+Any of the entries listed above marked with "Global" can be specified at the "Global" level. If the setting (eg. "dns-server") can be applied at both a network and a global level then the global level operates as a default/fallback.
+
+### NETWORK SETTINGS
+
+Any of the entries listed above marked with "Applies to network" can be specified for each network. Each network section represents one link to the outside world. In the initial example your `dsvr.ini` file would have three network sections in addition to your global section eg.
+
+```ini
+[global]
+...
+
+[network-us-vpn]
+device=tun0
+...
+
+[network-uk-vpn]
+device=tun1
+...
+
+[network-au-vpn]
+device=tun2
+
+```
+
+Whilst the network sections do not have to be a VPN link it is their intended purpose. As such you would want each network section to have its own `dns-server` entry which is your VPN provider's name server for that network. If you do not specify this then the DNS requests will be handled by the `dns-server` in the global section which may result in leaking of information.
+
+#### WHITELIST FORMAT
+
+The file referenced by the `whitelist` setting is a simple text file containing a list of domain names that are valid for that network section. Each domain name is specified on a newline. Comments may be specified by a `#` as the first character in the line.
+
+If a domain name does not start with a `.` then it is considered an exact match (eg. `domain.com` would match `domain.com` but not `www.domain.com`). 
+
+If the domain name starts with a `.` then it is a TLD match; any child domain of the record will be matched (eg. `.domain.com` would match `www.domain.com` and `domain.com`)
 
 **Documentation beyond here is old**
 
