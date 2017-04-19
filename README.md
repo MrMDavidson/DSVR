@@ -44,10 +44,6 @@ The key parts here are that DSVR acts as a nameserver on your network and relies
 2) A working internet connection from the Linux machine
 3) A working VPN connection from the Linux machine
 
-## KNOWN LIMITATIONS
-
-1) Cannot perform source-based VPN routing without removal of existing NAT boundary, so that real sources can be determined. (see WIKI for workaround)
-
 ## TESTED WITH
 
 1) Raspbian on a Raspberry Pi
@@ -58,6 +54,18 @@ Once you have your machine set up and runnig you'll want to install DSVR.
 1) Install git; `sudo apt-get install git`
 2) Grab DSVR from git; `git clone https://github.com/MrMDavidson/DSVR.git ~/dsvr/src`
 3) Copy the sample config directory: `cp -R ~/dsvr/src/sample ~/dsvr/config`
+4) (Optional) Install as a service
+    1) Edit `~/dsvr/config/init-d-script` and modify the paths of `EXECUTABLEPATH` and `INIPATH` appropriately
+    2) Copy the init-d-script to the appropriate location; `cp ~/dsvr/config/init-d-script /etc/init.d/dsvr`
+    3) Install the service; `update-rc.d dsvr`
+
+*Note:* Instead of running a service you can manually run dsvr with;
+
+```shell
+/path/to/dsvr.py --file /path/to/dsvr.ini
+```
+
+Additional arguments, and their help, can be found by running `/path/to/dsvr.py --help`
 
 ## CONFIGURATION
 
@@ -136,6 +144,8 @@ Everytime an DNS entry is resolved this script is called with the following argu
     
     Copyright (C) 2013 Peter Kacherginsky
     All rights Reserved
+    
+    Forked from https://github.com/dboyd13/DSVR
 
 **LICENSE**
 
