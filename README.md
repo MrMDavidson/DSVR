@@ -109,6 +109,26 @@ If a domain name does not start with a `.` then it is considered an exact match 
 
 If the domain name starts with a `.` then it is a TLD match; any child domain of the record will be matched (eg. `.domain.com` would match `www.domain.com` and `domain.com`)
 
+### ROUTE MANAGEMENT
+
+In the `scripts` folder are two scripts;
+
+#### `scripts/iprule-clear-table.sh`
+
+Called on start up, once for each `[network-]` section with the name of the network as an argument (eg. `[network-test]` would be called with the argument `test`).
+
+This script is responsible for clearing the state of the routing table for the given network.
+
+#### `scripts/iprule-add-route.sh`
+
+Everytime an DNS entry is resolved this script is called with the following arguments;
+
+| Position | Name        | Purpose                                                                                                                                     |
+|----------|-------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| $1       | IP Address  | The IP address of resolved DNS entry that a route is required for                                                                           |
+| $2       | Device Name | The name of the device the route is required for (eg. `tun0`, from the `dsvr.ini` file for the network)                                     |
+| $3       | Gateway     | If a default gateway exists for the device this route is for then this argument will be non-empty and be the address of the default gateway |
+
 **Documentation beyond here is old**
 
 1) Flash your SD card with Raspbain (Wheezy 2012-12-16) http://downloads.raspberrypi.org/images/raspbian/2012-12-16-wheezy-raspbian/2012-12-16-wheezy-raspbian.zip  
