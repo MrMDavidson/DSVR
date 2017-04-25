@@ -40,8 +40,10 @@ import binascii
 import netifaces
 
 class DNSHandler():
-           
-    def parse(self,data):
+    #def __init__(self, blacklist):
+#        self._blacklist = blacklist
+
+    def parse(self, data, blacklist):
         response = ""
     
         try:
@@ -55,40 +57,45 @@ class DNSHandler():
         else:
             print "[ ] %s wants to look up %s" % (self.client_address[0], str(d.q.qname))
             
-            network = getRelevantNetwork(fallback, networks, str(d.q.qname))
-            nameserver_tuple = random.choice(network.dnsservers).split('#')
+            if self.isBlacklisted(str(d.q.qname), blacklist):
+                response = d.reply()
+                response.header.rcode = RCODE.NXDOMAIN
+                return response.pack()
+            else:
 
-            print "[ ] \"%s\" will route via %s. Looking up via %s" % (d.q.qname, network.devicename, nameserver_tuple[0] )
-               
-            response = self.proxyrequest(data, network.devicename, network.timeout, *nameserver_tuple)
+                network = getRelevantNetwork(fallback, networks, str(d.q.qname))
+                nameserver_tuple = random.choice(network.dnsservers).split('#')
+
+                print "[ ] \"%s\" will route via %s. Looking up via %s" % (d.q.qname, network.devicename, nameserver_tuple[0] )
+                
+                response = self.proxyrequest(data, network.devicename, network.timeout, *nameserver_tuple)
+                
+                if network.isfallback == True:
+                    return response
+
+                d = DNSRecord.parse(response)
             
-            if network.isfallback == True:
-                return response
+                for item in d.rr:               
+                    try:
+                        socket.inet_aton(str(item.rdata))
+                    except:
+                        print "[DB] Unable to inet_aton %s" % str(item.rdata)
+                        continue
+                    if str(item.rdata) in added_routes:
+                        print "[DB] Have previously added %s. Skipping" % str(item.rdata)
+                        continue
 
-            d = DNSRecord.parse(response)
-           
-            for item in d.rr:               
-                try:
-                    socket.inet_aton(str(item.rdata))
-                except:
-                    print "[DB] Unable to inet_aton %s" % str(item.rdata)
-                    continue
-                if str(item.rdata) in added_routes:
-                    print "[DB] Have previously added %s. Skipping" % str(item.rdata)
-                    continue
+                    command = network.addroutecommand(str(item.rdata))
+                    print "[DB+] Adding %s via  \"%s\"" % (str(item.rdata), command)
+                    os.system(command)
+                    added_routes.append(str(item.rdata))
 
-                command = network.addroutecommand(str(item.rdata))
-                print "[DB+] Adding %s via  \"%s\"" % (str(item.rdata), command)
-                os.system(command)
-                added_routes.append(str(item.rdata))
+                    if network.ttloverride != -1:
+                        print "[ ] DNS response has a TTL of %r. Will override to %r" % (item.ttl , min(network.ttloverride, item.ttl) )
+                        item.ttl = min(network.ttloverride, item.ttl)
 
-                if network.ttloverride != -1:
-                    print "[ ] DNS response has a TTL of %r. Will override to %r" % (item.ttl , min(network.ttloverride, item.ttl) )
-                    item.ttl = min(network.ttloverride, item.ttl)
+                response = d.pack()
 
-
-            response = d.pack()
-            
         return response         
         
     # Obtain a response from a real DNS server.
@@ -115,12 +122,37 @@ class DNSHandler():
             else:
                     return reply 
 
-# UDP DNS Handler for incoming requests
-class UDPHandler(DNSHandler, SocketServer.BaseRequestHandler):
+    def isBlacklisted(self, domain, blacklist):
+        extracted = tldextract.extract(str(domain))
+        tld = extracted.domain + "." + extracted.suffix
+        if len(extracted.subdomain) > 0:
+            full = extracted.subdomain + "." + tld
+        else:
+            full = tld
 
+        for entry in blacklist:
+            if len(entry) == 0: continue
+            
+            if entry[0] == ".":
+                # TLD match
+                entry = entry[1:]
+                if entry == tld:
+                    print "[ ] Blacklisted TLD style match for \"%s\" against \"%s\". Will drop" % (full, entry)
+                    return True
+            else:
+                # Exact match
+                if entry == full:
+                    print "[ ] Blacklisted exact match for \"%s\" against \"%s\". Will drop" % (full, entry)
+                    return True
+
+        return False
+
+# UDP DNS Handler for incoming requests
+class UDPHandler(DNSHandler , SocketServer.BaseRequestHandler):
+    
     def handle(self):
         (data,socket) = self.request
-        response = self.parse(data)
+        response = self.parse(data, self.server.blacklist)
         
         if response:
             socket.sendto(response, self.client_address)
@@ -134,7 +166,7 @@ class TCPHandler(DNSHandler, SocketServer.BaseRequestHandler):
         # Remove the addition "length" parameter used in
         # TCP DNS protocol
         data = data[2:] 
-        response = self.parse(data)
+        response = self.parse(data, self.server.blacklist)
         
         if response:
             # Calculate and add the additional "length" parameter
@@ -145,12 +177,13 @@ class TCPHandler(DNSHandler, SocketServer.BaseRequestHandler):
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
     # Override SocketServer.UDPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, fallback, networks, ipv6):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, fallback, networks, ipv6, blacklist):
         self.nametodns  = nametodns
         self.fallback = fallback
         self.networks = networks
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
+        self.blacklist = blacklist
 
         SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass)
 
@@ -160,12 +193,13 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     allow_reuse_address = True
 
     # Override SocketServer.TCPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, fallback, networks, ipv6):
+    def __init__(self, server_address, RequestHandlerClass, nametodns, fallback, networks, ipv6, blacklist):
         self.nametodns  = nametodns
         self.nameservers = nameservers
         self.ttloverride = ttloverride
         self.ipv6        = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
+        self.blacklist = blacklist
 
         SocketServer.TCPServer.__init__(self,server_address,RequestHandlerClass) 
 
@@ -200,13 +234,13 @@ def getRelevantNetwork(fallback, networks, domain):
     return fallback
         
 # Initialize and start dsvr        
-def start_cooking(interface, nametodns, fallback, networks, tcp=False, ipv6=False, port="53"):
+def start_cooking(interface, nametodns, fallback, networks, tcp=False, ipv6=False, port="53",blacklist = []):
     try:
         if tcp:
             print "[*] dsvr is running in TCP mode"
-            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, fallback, networks, ipv6)
+            server = ThreadedTCPServer((interface, int(port)), TCPHandler, nametodns, fallback, networks, ipv6, blacklist)
         else:
-            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, fallback, networks, ipv6)
+            server = ThreadedUDPServer((interface, int(port)), UDPHandler, nametodns, fallback, networks, ipv6, blacklist)
 
         # Start a thread with the server -- that thread will then start one
         # more threads for each request
@@ -223,6 +257,20 @@ def start_cooking(interface, nametodns, fallback, networks, tcp=False, ipv6=Fals
         print "[*] dsvr is shutting down."
         sys.exit()
 
+def read_domain_file(domainfile):
+    file = open(domainfile, 'r')
+    domains = []
+    for line in file:
+        line = line.rstrip()
+        if len(line) == 0: continue
+        if line[0] == '#': continue
+
+        domains.append(line)
+
+    file.close()
+
+    return domains
+
 class NetworkInfo:
     def __init__(self, dnsservers, domainlistfile, devicename, ttloverride, timeout, devicegateway = '', isfallback = False):
         self._dnsservers = dnsservers
@@ -233,17 +281,9 @@ class NetworkInfo:
         self._devicegateway = devicegateway
 
         if domainlistfile != None:
-            file = open(domainlistfile, 'r')
-            self._domains = []
-            for line in file:
-                line = line.rstrip()
-                if len(line) == 0: continue
-                if line[0] == '#': continue
-                print "[ ] Have rule for \"%s\"" % line
-
-                self._domains.append(line)
-
-            file.close()
+            self._domains = read_domain_file(domainlistfile)
+            for domain in self._domains:
+                print "[ ] Have rule for \"%s\"" % domain
 
     @property
     def dnsservers(self):
@@ -347,6 +387,10 @@ if __name__ == "__main__":
                 print "[ ] Interface was specified in INI file as %s" % config.get("Global", "server-listen-ip")
                 options.interface = config.get("Global", "server-listen-ip")
                 
+        blacklistfile = config.get('Global', 'blacklist')
+        blacklist = []
+        if blacklistfile != None:
+            blacklist = read_domain_file(blacklistfile)
 
         fallback = NetworkInfo(fallbackdnsservers, None, 'Global', fallbackttloverride, fallbackdnstimeout, None, True)
 
@@ -409,6 +453,4 @@ if __name__ == "__main__":
             os.system(command)
    
     # Launch dsvr
-    start_cooking(interface=options.interface, nametodns=nametodns, fallback=fallback, networks=networks, tcp=options.tcp, ipv6=options.ipv6, port=options.port)
-
-
+    start_cooking(interface=options.interface, nametodns=nametodns, fallback=fallback, networks=networks, tcp=options.tcp, ipv6=options.ipv6, port=options.port, blacklist=blacklist)

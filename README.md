@@ -79,12 +79,19 @@ The majority of your configuration is done via editing your `dsvr.ini` file. Thi
 | ttl-override     | Yes    | Yes                | Overrides the DNS entry's time-to-live value when returned to clients                                                                               |
 | dns-timeout      | Yes    | No                 | Number of seconds to wait before failing a name resolution from a server                                                                            |
 | server-listen-ip | Yes    | No                 | Address to listen to DNS requests on. If absent will use 0.0.0.0 (ie. all interfaces)                                                               |
+| blacklist        | Yes    | No                 | Path to a file containing a list of entries that should always return NXDOMAIN. ie. That the domain doesn't exist.                                  |
 | device           | No     | Yes                | Device to route matching requests over                                                                                                              |
-| whitelist        | No     | Yes                | Path to a file containing list of entries that should be routed via this network                                                                    |
+| whitelist        | No     | Yes                | Path to a file containing a list of entries that should be routed via this network                                                                  |
 
 ### GLOBAL SETTINGS
 
 Any of the entries listed above marked with "Global" can be specified at the "Global" level. If the setting (eg. "dns-server") can be applied at both a network and a global level then the global level operates as a default/fallback.
+
+#### BLACKLIST FORMAT
+
+The blacklist file format is the same as the [whitelist format](#whitelistformat). Refer to that for more details.
+
+The difference is in the meaning of the file; when a computer on the network attempts to resolve a domain (or TLD match domain) from the blacklist file it will get an NXDOMAIN response. This is a "Domain does not exist" response and tells the requesting computer the domain cannot be found. This can be used to stop users from visiting a malicious site (eg. malware domains or ad domains)
 
 ### NETWORK SETTINGS
 
@@ -109,7 +116,7 @@ device=tun2
 
 Whilst the network sections do not have to be a VPN link it is their intended purpose. As such you would want each network section to have its own `dns-server` entry which is your VPN provider's name server for that network. If you do not specify this then the DNS requests will be handled by the `dns-server` in the global section which may result in leaking of information.
 
-#### WHITELIST FORMAT
+#### WHITELIST FORMAT<a name="whitelistformat"></a>
 
 The file referenced by the `whitelist` setting is a simple text file containing a list of domain names that are valid for that network section. Each domain name is specified on a newline. Comments may be specified by a `#` as the first character in the line.
 
