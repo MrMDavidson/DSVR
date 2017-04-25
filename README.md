@@ -56,10 +56,12 @@ Once you have your machine set up and runnig you'll want to install DSVR.
 2) Grab DSVR from git; `git clone https://github.com/MrMDavidson/DSVR.git ~/dsvr/src`
 3) Copy the sample config directory: `cp -R ~/dsvr/src/sample ~/dsvr/config`
 4) (Optional) Install as a service
-    1) Edit `~/dsvr/config/init-d-script` and modify the paths of `EXECUTABLEPATH` and `INIPATH` appropriately
+    1) Edit `~/dsvr/config/init-d-script` and modify the paths of `DSVRPATH` and `INIPATH` appropriately
     2) Optional: Update te `BLOCKLISTSRC`, `BLOCKLISTOUTPUT`. See [Ad Blocking](#adblocking) for more information.
-    2) Copy the init-d-script to the appropriate location; `cp ~/dsvr/config/init-d-script /etc/init.d/dsvr`
-    3) Install the service; `update-rc.d dsvr`
+        1)  Mark the adlist script as executable; `chmod +x ~/dsvr/adlist-to-blacklist.py`
+    3) Copy the init-d-script to the appropriate location; `cp ~/dsvr/config/init-d-script /etc/init.d/dsvr`
+    4) Mark the dsvr script as exectutable`chmod +x /etc/init.d/dsvr`
+    5) Install the service; `update-rc.d dsvr defaults`
 
 *Note:* Instead of running a service you can manually run dsvr with;
 
