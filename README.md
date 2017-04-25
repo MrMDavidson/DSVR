@@ -155,7 +155,7 @@ The blacklist feature can be used to implement DNS based ad blocking. In the roo
 | Argument | Shortform | Purpose                                                                                                                                                              |
 |----------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | --input  | -i        | Either a path to a file, or an URL containing a file which is a list of other files/URLs which contain a list of host entries or domain names that should be blocked |
-| --outpu  | -o        | Path to write the parsed results of the input file into. The result will be suitable for use with the `blacklist` option of `dsvr.py`'s ini file                     |
+| --output | -o        | Path to write the parsed results of the input file into. The result will be suitable for use with the `blacklist` option of `dsvr.py`'s ini file                     |
 
 An example would be to consume the [Pi Hole](https://pi-hole.net/) project's ad list file to produce a blacklist of domains. Eg:
 ```shell
