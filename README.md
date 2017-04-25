@@ -57,6 +57,7 @@ Once you have your machine set up and runnig you'll want to install DSVR.
 3) Copy the sample config directory: `cp -R ~/dsvr/src/sample ~/dsvr/config`
 4) (Optional) Install as a service
     1) Edit `~/dsvr/config/init-d-script` and modify the paths of `EXECUTABLEPATH` and `INIPATH` appropriately
+    2) Optional: Update te `BLOCKLISTSRC`, `BLOCKLISTOUTPUT`. See [Ad Blocking](#adblocking) for more information.
     2) Copy the init-d-script to the appropriate location; `cp ~/dsvr/config/init-d-script /etc/init.d/dsvr`
     3) Install the service; `update-rc.d dsvr`
 
@@ -145,7 +146,7 @@ Everytime an DNS entry is resolved this script is called with the following argu
 | $2       | Device Name | The name of the device the route is required for (eg. `tun0`, from the `dsvr.ini` file for the network)                                     |
 | $3       | Gateway     | If a default gateway exists for the device this route is for then this argument will be non-empty and be the address of the default gateway |
 
-## AD BLOCKING
+## AD BLOCKING<a name="adblocking"></a>
 
 The blacklist feature can be used to implement DNS based ad blocking. In the root directory there is an `adlist-to-blacklist.py` script. This has the following arguments;
 
