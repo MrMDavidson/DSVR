@@ -8,8 +8,11 @@
 # Description:       Domain Specific Routing
 ### END INIT INFO
 
-EXECUTABLEPATH="/path/to/dsvr/dsvr.py"
+DSVRPATH="/path/to/dsvr"
+EXECUTABLEPATH="$DSVRPATH/dsvr.py"
 INIPATH="/path/to/dsvr/config/dsvr.ini"
+BLOCKLISTSRC="https://raw.githubusercontent.com/pi-hole/pi-hole/master/adlists.default"
+BLOCKLISTOUTPUT="/path/to/dsvr/config/blacklist.txt"
 
 SCRIPT="$EXECUTABLEPATH --file $INIPATH"
 RUNAS=root
@@ -23,6 +26,13 @@ start() {
     echo 'Service already running' >&2
     return 1
   fi
+  echo 
+
+  if [ ! -z "BLOCKLISTSRC" ]; then
+    echo "Updating blocklist" >&2
+    eval "$DSVRPATH/adlist-to-blacklist.py -i $BLOCKLISTSRC -o $BLOCKLISTOUTPUT" 
+  fi
+
   echo 'Starting service.' >&2
   local CMD="$SCRIPT &> \"$LOGFILE\" & echo \$!"
   su -c "$CMD" $RUNAS > "$PIDFILE"
