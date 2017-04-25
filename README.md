@@ -28,7 +28,8 @@ Please review my blog post here http://darranboyd.wordpress.com/2013/07/05/selec
 ```
 2) Supports multiple "networks"
 3) User specified DNS server for per-site DNS queries, for privacy from your ISP.  
-4) Port Forwarding & uPnP on existing router/AP not affected (see TODO)  
+4) Blacklisting of domains; a list of domains can be provided that will not resolve. This can be used to prevent access to malicious sites
+5) Port Forwarding & uPnP on existing router/AP not affected (see TODO)  
 
 ## HOW IT WORKS
 
@@ -143,6 +144,20 @@ Everytime an DNS entry is resolved this script is called with the following argu
 | $1       | IP Address  | The IP address of resolved DNS entry that a route is required for                                                                           |
 | $2       | Device Name | The name of the device the route is required for (eg. `tun0`, from the `dsvr.ini` file for the network)                                     |
 | $3       | Gateway     | If a default gateway exists for the device this route is for then this argument will be non-empty and be the address of the default gateway |
+
+## AD BLOCKING
+
+The blacklist feature can be used to implement DNS based ad blocking. In the root directory there is an `adlist-to-blacklist.py` script. This has the following arguments;
+
+| Argument | Shortform | Purpose                                                                                                                                                              |
+|----------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| --input  | -i        | Either a path to a file, or an URL containing a file which is a list of other files/URLs which contain a list of host entries or domain names that should be blocked |
+| --outpu  | -o        | Path to write the parsed results of the input file into. The result will be suitable for use with the `blacklist` option of `dsvr.py`'s ini file                     |
+
+An example would be to consume the [Pi Hole](https://pi-hole.net/) project's ad list file to produce a blacklist of domains. Eg:
+```shell
+adlist-to-blocklist.py -i https://raw.githubusercontent.com/pi-hole/pi-hole/master/adlists.default -o ~/dsvr/config/blacklist.txt
+```
 
 
 **CREDIT**
