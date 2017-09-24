@@ -130,22 +130,22 @@ class DNSHandler():
         else:
             full = tld
 
-        for entry in blacklist:
-            if len(entry) == 0: continue
-            
-            if entry[0] == ".":
-                # TLD match
-                entry = entry[1:]
-                if entry == tld:
-                    print "[ ] Blacklisted TLD style match for \"%s\" against \"%s\". Will drop" % (full, entry)
-                    return True
-            else:
-                # Exact match
-                if entry == full:
-                    print "[ ] Blacklisted exact match for \"%s\" against \"%s\". Will drop" % (full, entry)
-                    return True
+        # Match against the TLD
+        tldMatch = blacklist.get(tld, None)
+        if tldMatch == None:
+            # No result - match against the full domain
+            tldMatch = blacklist.get(full, None)
 
-        return False
+        if tldMatch == None:
+            return False
+
+        if tldMatch == True:
+            print "[ ] Blacklisted TLD style match for \"%s\" against \"%s\". Will drop" % (full, tld)
+        else:
+            print "[ ] Blacklisted exact match for \"%s\" against \"%s\". Will drop" % (full, full)
+
+        return True
+
 
 # UDP DNS Handler for incoming requests
 class UDPHandler(DNSHandler , SocketServer.BaseRequestHandler):
@@ -271,6 +271,24 @@ def read_domain_file(domainfile):
 
     return domains
 
+def read_blacklist_file(blacklistfile):
+    raw = read_domain_file(blacklistfile)
+    result = dict()
+
+    for entry in raw:
+        tldMatch = False
+
+        if entry[0] == ".":
+            entry = entry[1:]
+            tldMatch = True
+
+        result[entry] = tldMatch
+
+
+    print "[ ] Running with a blacklist of %i entries" % ( len(result) )
+
+    return result
+
 class NetworkInfo:
     def __init__(self, dnsservers, domainlistfile, devicename, ttloverride, timeout, devicegateway = '', isfallback = False):
         self._dnsservers = dnsservers
@@ -390,7 +408,7 @@ if __name__ == "__main__":
         blacklistfile = config.get('Global', 'blacklist')
         blacklist = []
         if blacklistfile != None:
-            blacklist = read_domain_file(blacklistfile)
+            blacklist = read_blacklist_file(blacklistfile)
 
         fallback = NetworkInfo(fallbackdnsservers, None, 'Global', fallbackttloverride, fallbackdnstimeout, None, True)
 
