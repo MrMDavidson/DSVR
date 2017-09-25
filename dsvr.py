@@ -40,9 +40,6 @@ import binascii
 import netifaces
 
 class DNSHandler():
-    #def __init__(self, blacklist):
-#        self._blacklist = blacklist
-
     def parse(self, data, blacklist):
         response = ""
     
