@@ -128,21 +128,27 @@ class DNSHandler():
             full = tld
 
         # Match against the TLD
+        tldMatch = blacklist.get(full, None)
+        if tldMatch != None:
+            print "[ ] Blacklisted an exact match for \"%s\" against \"%s\". Will drop" % (domain, full)
+            return True
+        
+        # No result - match against the TLD
         tldMatch = blacklist.get(tld, None)
-        if tldMatch == None:
-            # No result - match against the full domain
-            tldMatch = blacklist.get(full, None)
 
         if tldMatch == None:
             return False
 
         if tldMatch == True:
-            print "[ ] Blacklisted TLD style match for \"%s\" against \"%s\". Will drop" % (full, tld)
-        else:
-            print "[ ] Blacklisted exact match for \"%s\" against \"%s\". Will drop" % (full, full)
+            # TLD match (eg. www.adsite.com being blocked by the entry adsite.com)
+            print "[ ] Blacklisted TLD style match for \"%s\" against \"%s\". Will drop" % (domain, tld)
+            return True
 
-        return True
+        if normalise_text(domain) == normalise_text(tld):
+            print  "[ ] Blacklisted exact match for \"%s\" against \"%s\". Will drop" % (domain, tld)
+            return True
 
+        return False
 
 # UDP DNS Handler for incoming requests
 class UDPHandler(DNSHandler , SocketServer.BaseRequestHandler):
@@ -285,6 +291,9 @@ def read_blacklist_file(blacklistfile):
     print "[ ] Running with a blacklist of %i entries" % ( len(result) )
 
     return result
+
+def normalise_text(text):
+    return text.upper().lower()
 
 class NetworkInfo:
     def __init__(self, dnsservers, domainlistfile, devicename, ttloverride, timeout, devicegateway = '', isfallback = False):
